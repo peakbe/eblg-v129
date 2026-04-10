@@ -8,6 +8,17 @@ import "./metar.js";
 import "./taf.js";
 import "./fids.js";
 import "./sonometers.js";
+import { updateStatusPanel } from "./status.js";
+
+document.addEventListener("DOMContentLoaded", () => {
+    console.log("[APP] Initialisation…");
+
+    const map = initMap();
+    if (!map) return;
+
+    updateStatusPanel();
+});
+
 
 document.addEventListener("DOMContentLoaded", () => {
     console.log("[APP] Initialisation…");
