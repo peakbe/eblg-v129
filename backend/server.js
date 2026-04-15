@@ -211,9 +211,13 @@ app.get("/fids", async (req, res) => {
 // =========================
 // SONOMETERS
 // =========================
+import { SONOMETERS } from "./sonometers-data.js"; // si tu veux un fichier séparé
+// ou copie-colle directement la liste ici
+
 app.get("/sonos", (req, res) => {
-    res.json({ ok: true });
+    res.json(SONOMETERS);
 });
+
 
 // =========================
 // START SERVER
