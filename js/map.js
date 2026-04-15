@@ -36,7 +36,7 @@ export function initMap() {
         window.corridorLayer = L.layerGroup().addTo(map);
 
         // Modules
-        initSonometers(map);
+        
 
         console.log("[MAP] Carte initialisée avec succès.");
         return map;
