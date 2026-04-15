@@ -211,12 +211,12 @@ app.get("/fids", async (req, res) => {
 // =========================
 // SONOMETERS
 // =========================
-import { SONOMETERS } from "./sonometers-data.js"; // si tu veux un fichier séparé
-// ou copie-colle directement la liste ici
+import { SONOMETERS } from "./sonometers-data.js";
 
 app.get("/sonos", (req, res) => {
     res.json(SONOMETERS);
 });
+
 
 
 // =========================
