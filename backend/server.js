@@ -1,3 +1,23 @@
+const cache = {
+    metar: { ts: 0, data: null },
+    taf: { ts: 0, data: null },
+    fids: { ts: 0, data: null }
+};
+
+function getCache(key, ttl = 60000) {
+    const now = Date.now();
+    if (cache[key].data && (now - cache[key].ts < ttl)) {
+        console.log("[CACHE HIT]", key);
+        return cache[key].data;
+    }
+    return null;
+}
+
+function setCache(key, data) {
+    cache[key].ts = Date.now();
+    cache[key].data = data;
+}
+
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
@@ -88,28 +108,42 @@ app.get("/taf", async (req, res) => {
 });
 
 // =========================
-// FIDS (OpenSky → fallback propre)
+// FIDS — AviationStack PRO+
 // =========================
 app.get("/fids", async (req, res) => {
-    const now = Math.floor(Date.now() / 1000);
-    const begin = now - 3600;
+    const cached = getCache("fids");
+    if (cached) return res.json(cached);
 
-    const url = `https://opensky-network.org/api/flights/departure?airport=EBLG&begin=${begin}&end=${now}`;
+    const url = `http://api.aviationstack.com/v1/flights?dep_iata=LGG&limit=10&access_key=${process.env.AVIATIONSTACK_KEY}`;
     const data = await safeFetch(url);
 
-    if (data.fallback) {
-        return res.json([{
+    // Si l’API ne répond pas ou renvoie une erreur
+    if (data.fallback || !data.data) {
+        const fallback = [{
             flight: "N/A",
             destination: "N/A",
             time: "N/A",
             status: "Unavailable",
             fallback: true,
             timestamp: new Date().toISOString()
-        }]);
+        }];
+        setCache("fids", fallback);
+        return res.json(fallback);
     }
 
-    res.json(data);
+    // Transformation des données AviationStack → format dashboard
+    const flights = data.data.map(f => ({
+        flight: f.flight?.iata || f.flight?.number || "N/A",
+        destination: f.arrival?.iata || "N/A",
+        time: f.departure?.scheduled || "N/A",
+        status: f.flight_status || "N/A",
+        fallback: false
+    }));
+
+    setCache("fids", flights);
+    res.json(flights);
 });
+
 
 // =========================
 // START SERVER
