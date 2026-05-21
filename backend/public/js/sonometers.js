@@ -45,7 +45,11 @@ function renderSonometers(list) {
     sonoMarkersLayer.clearLayers();
 
     list.forEach(s => {
-        if (!s.lat || !s.lon) return;
+        // Vérification stricte
+        if (typeof s.lat !== "number" || typeof s.lon !== "number") {
+            console.warn("[SONO] Coordonnées invalides", s);
+            return;
+        }
 
         const icon = L.divIcon({
             className: "sono-marker",
@@ -56,6 +60,7 @@ function renderSonometers(list) {
             iconSize: [20, 20]
         });
 
+        // Utilisation EXACTE des coordonnées backend
         L.marker([s.lat, s.lon], { icon }).addTo(sonoMarkersLayer);
     });
 
