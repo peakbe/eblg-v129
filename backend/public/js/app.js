@@ -1,18 +1,8 @@
 // ======================================================
 // APP.JS — Cockpit IFR EBLG PRO+++
-// Orchestration globale + Timers + UI + ADS-B robuste
 // ======================================================
 
-import { ENDPOINTS } from "./config.js";
-
-import {
-    initMap,
-    resetMapView,
-    toggleNoiseHeatmap,
-    toggleNoiseZones,
-    updateADSB,
-    initDebugPanel
-} from "./map.js";
+import { initMap, resetMapView, toggleNoiseHeatmap, toggleNoiseZones, initDebugPanel } from "./map.js";
 
 import { initMetar, safeLoadMetar } from "./metar.js";
 import { initTaf, safeLoadTaf } from "./taf.js";
@@ -22,30 +12,40 @@ import { checkApiStatus } from "./status.js";
 import { loadLogs } from "./logs.js";
 import { startLiveLogs } from "./logsLive.js";
 
-// ======================================================
+// ------------------------------------------------------
 // INIT GLOBAL
-// ======================================================
-document.addEventListener("DOMContentLoaded", () => {
+// ------------------------------------------------------
+window.addEventListener("DOMContentLoaded", () => {
+
+    console.log("[APP] Initialisation cockpit IFR…");
+
+    // Carte
     initMap();
     initDebugPanel();
 
+    // Météo
     initMetar();
     initTaf();
 
+    // Modules
     safeLoadFids();
     loadSonometers();
-    checkApiStatus();
     loadLogs();
     startLiveLogs();
 
-    startAdsbLoop();
+    // Status API
+    checkApiStatus();
+
+    // Timers
     setupTimers();
+
+    // UI
     setupUIBindings();
 });
 
-// ======================================================
+// ------------------------------------------------------
 // TIMERS
-// ======================================================
+// ------------------------------------------------------
 function setupTimers() {
     setInterval(safeLoadMetar, 60_000);
     setInterval(safeLoadTaf, 10 * 60_000);
@@ -55,79 +55,34 @@ function setupTimers() {
     setInterval(loadLogs, 120_000);
 }
 
-// ======================================================
-// ADS-B LOOP — VERSION ROBUSTE ANTI-HTML PRO+++
-// ======================================================
-function startAdsbLoop() {
-    const POLL_MS = 5_000;
-
-    const loop = async () => {
-        try {
-            const r = await fetch(ENDPOINTS.adsb || "/api/adsb");
-            if (!r.ok) throw new Error("HTTP " + r.status);
-
-            // On lit d'abord en texte pour détecter le HTML
-            const text = await r.text();
-
-            // 🔥 Si la réponse commence par "<", c'est du HTML → on ignore
-            if (text.trim().startsWith("<")) {
-                console.warn("[ADSB] Réponse HTML ignorée");
-                updateADSB([]);
-                return setTimeout(loop, POLL_MS);
-            }
-
-            // Tentative de parse JSON
-            let json;
-            try {
-                json = JSON.parse(text);
-            } catch (e) {
-                console.warn("[ADSB] JSON invalide");
-                updateADSB([]);
-                return setTimeout(loop, POLL_MS);
-            }
-
-            // Structure correcte : { ac: [...] }
-            const list = json.ac || [];
-            updateADSB(list);
-
-        } catch (err) {
-            console.error("[ADSB] Erreur", err);
-            updateADSB([]);
-        } finally {
-            setTimeout(loop, POLL_MS);
-        }
-    };
-
-    loop();
-}
-
-// ======================================================
-// UI BINDINGS
-// ======================================================
+// ------------------------------------------------------
+// UI
+// ------------------------------------------------------
 function setupUIBindings() {
-    const resetBtn = document.getElementById("btn-reset-map");
-    if (resetBtn) {
-        resetBtn.addEventListener("click", () => resetMapView());
-    }
 
+    // Reset carte
+    const resetBtn = document.getElementById("btn-reset-map");
+    if (resetBtn) resetBtn.addEventListener("click", () => resetMapView());
+
+    // Heatmap
     const heatmapToggle = document.getElementById("btn-heatmap");
     if (heatmapToggle) {
-        heatmapToggle.addEventListener("change", (e) => {
-            const state = e.target.checked ?? e.target.classList.contains("active");
-            toggleNoiseHeatmap(state);
+        heatmapToggle.addEventListener("change", e => {
+            toggleNoiseHeatmap(e.target.checked);
         });
     }
 
+    // Zones bruit
     const noiseZonesBtn = document.getElementById("btn-noisezones-toggle");
     if (noiseZonesBtn) {
         noiseZonesBtn.addEventListener("click", () => toggleNoiseZones());
     }
 
+    // Onglets
     const tabs = document.querySelectorAll("[data-panel-target]");
     tabs.forEach(tab => {
         tab.addEventListener("click", () => {
             const targetId = tab.getAttribute("data-panel-target");
-            if (!targetId) return;
 
             document.querySelectorAll(".panel").forEach(p => p.classList.add("hidden"));
             const panel = document.getElementById(targetId);
