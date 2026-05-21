@@ -241,3 +241,44 @@ pre {
     font-size: 14px;
     text-align: center;
 }
+
+/* ======================================================
+   FIDS — Cockpit IFR
+   ====================================================== */
+.fids-section {
+    margin-bottom: 15px;
+}
+
+.fids-title {
+    font-size: 15px;
+    font-weight: bold;
+    color: #00eaff;
+    margin-bottom: 6px;
+}
+
+.fids-empty {
+    font-size: 13px;
+    opacity: 0.6;
+}
+
+.fids-row {
+    display: grid;
+    grid-template-columns: 60px 80px 1fr 90px;
+    padding: 6px 4px;
+    margin-bottom: 4px;
+    background: #14191e;
+    border: 1px solid #22282f;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.fids-row.st-ontime { border-left: 4px solid #00ff9d; }
+.fids-row.st-delay { border-left: 4px solid #ffcc00; }
+.fids-row.st-boarding { border-left: 4px solid #00eaff; }
+.fids-row.st-final { border-left: 4px solid #ff8800; }
+.fids-row.st-cancel { border-left: 4px solid #ff0033; }
+.fids-row.st-unknown { border-left: 4px solid #666; }
+
+.fids-col {
+    padding: 0 4px;
+}
