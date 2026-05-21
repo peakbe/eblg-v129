@@ -159,20 +159,16 @@ let adsbCache = null;
 let adsbCacheTime = 0;
 
 app.get("/api/adsb", async (req, res) => {
-    const now = Date.now();
-
-    // Cache 10 s
-    if (adsbCache && now - adsbCacheTime < 10000) {
-        return res.json(adsbCache);
-    }
+    const cached = getCachedAdsb();
+    if (cached) return res.json(cached);
 
     try {
         const url = `https://airlabs.co/api/v9/flights?api_key=${process.env.AIRLABS_KEY}`;
         const r = await fetch(url);
 
         if (!r.ok) {
-            console.error("[ADSB] Airlabs HTTP", r.status);
-            if (adsbCache) return res.json(adsbCache);
+            console.error("[ADSB] AirLabs HTTP", r.status);
+            if (cached) return res.json(cached);
             return res.status(502).json({ error: "Airlabs upstream error" });
         }
 
@@ -199,14 +195,13 @@ app.get("/api/adsb", async (req, res) => {
 
         const payload = { ac };
 
-        adsbCache = payload;
-        adsbCacheTime = now;
-
-        res.json(payload);
+        setCachedAdsb(payload);
+        return res.json(payload);
 
     } catch (e) {
-        console.error("[ADSB] Airlabs fetch failed", e);
-        if (adsbCache) return res.json(adsbCache);
+        console.error("[ADSB] AirLabs fetch failed", e);
+        const cached = getCachedAdsb();
+        if (cached) return res.json(cached);
         res.status(500).json({ error: "ADSB fetch failed" });
     }
 });
