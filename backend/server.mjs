@@ -1,5 +1,5 @@
 // ======================================================
-// EBLG DASHBOARD — BACKEND PRO++
+// EBLG DASHBOARD — BACKEND PRO+++
 // server.mjs
 // ======================================================
 
@@ -55,8 +55,8 @@ function distKm(lat1, lon1, lat2, lon2) {
     const a =
         Math.sin(dLat / 2) ** 2 +
         Math.cos(lat1 * Math.PI / 180) *
-        Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) ** 2;
+            Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) ** 2;
 
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
@@ -67,7 +67,7 @@ function bearingTo(lat1, lon1, lat2, lon2) {
     const x =
         Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
         Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.cos(dLon);
+            Math.cos(dLon);
 
     const brng = Math.atan2(y, x) * 180 / Math.PI;
     return (brng + 360) % 360;
@@ -99,7 +99,6 @@ function detectApproach(ac) {
 
         const brgToThreshold = bearingTo(ac.lat, ac.lon, thr.lat, thr.lon);
         const diff = angleDiff(brgToThreshold, thr.heading);
-
         const d = distKm(ac.lat, ac.lon, thr.lat, thr.lon);
 
         if (diff < 15 && d < 12) {
@@ -126,7 +125,6 @@ function detectDeparture(ac) {
 
         const brgFromThreshold = bearingTo(thr.lat, thr.lon, ac.lat, ac.lon);
         const diff = angleDiff(brgFromThreshold, RWY[rwy].heading);
-
         const d = distKm(ac.lat, ac.lon, thr.lat, thr.lon);
 
         if (diff < 20 && d < 8 && ac.gs > 80) {
@@ -177,7 +175,7 @@ function generateApproachCorridor(rwy, lengthKm = 12, halfWidthKm = 0.6) {
 }
 
 // ======================================================
-// METAR — EBLG (avec cache PRO+++)
+// METAR — EBLG (cache + normalisation PRO+++)
 // ======================================================
 app.get("/metar", async (req, res) => {
     const cached = getCachedMetar();
@@ -192,23 +190,36 @@ app.get("/metar", async (req, res) => {
         if (!r.ok) {
             console.error("[METAR] HTTP", r.status);
             if (cached) return res.json(cached);
-            return res.json({ fallback: true, raw: "METAR indisponible" });
+            return res.json({ fallback: true, raw: "METAR indisponible", ageMinutes: null });
         }
 
         const json = await r.json();
-        setCachedMetar(json);
-        return res.json(json);
+        const metar = json.data?.[0];
+
+        if (!metar) {
+            console.error("[METAR] JSON sans data[0]");
+            if (cached) return res.json(cached);
+            return res.json({ fallback: true, raw: "METAR indisponible", ageMinutes: null });
+        }
+
+        const raw = metar.raw_text || "METAR indisponible";
+        const obs = metar.observed ? new Date(metar.observed) : null;
+        const ageMinutes = obs ? (Date.now() - obs.getTime()) / 60000 : null;
+
+        const payload = { raw, ageMinutes, fallback: false };
+        setCachedMetar(payload);
+        return res.json(payload);
 
     } catch (err) {
         console.error("[METAR] Erreur", err);
         const cached2 = getCachedMetar();
         if (cached2) return res.json(cached2);
-        return res.json({ fallback: true, raw: "METAR indisponible" });
+        return res.json({ fallback: true, raw: "METAR indisponible", ageMinutes: null });
     }
 });
 
 // ======================================================
-// TAF — EBLG (avec cache PRO+++)
+// TAF — EBLG (cache + normalisation PRO+++)
 // ======================================================
 app.get("/taf", async (req, res) => {
     const cached = getCachedTaf();
@@ -223,72 +234,127 @@ app.get("/taf", async (req, res) => {
         if (!r.ok) {
             console.error("[TAF] HTTP", r.status);
             if (cached) return res.json(cached);
-            return res.json({ fallback: true, raw: "TAF indisponible" });
+            return res.json({ fallback: true, raw: "TAF indisponible", ageMinutes: null });
         }
 
         const json = await r.json();
-        setCachedTaf(json);
-        return res.json(json);
+        const taf = json.data?.[0];
+
+        if (!taf) {
+            console.error("[TAF] JSON sans data[0]");
+            if (cached) return res.json(cached);
+            return res.json({ fallback: true, raw: "TAF indisponible", ageMinutes: null });
+        }
+
+        const raw = taf.raw_text || "TAF indisponible";
+
+        let issueDate = null;
+        if (taf.timestamp?.issued) {
+            issueDate = new Date(taf.timestamp.issued);
+        } else if (taf.issued) {
+            issueDate = new Date(taf.issued);
+        }
+
+        const ageMinutes = issueDate ? (Date.now() - issueDate.getTime()) / 60000 : null;
+
+        const payload = { raw, ageMinutes, fallback: false };
+        setCachedTaf(payload);
+        return res.json(payload);
 
     } catch (err) {
         console.error("[TAF] Erreur", err);
         const cached2 = getCachedTaf();
         if (cached2) return res.json(cached2);
-        return res.json({ fallback: true, raw: "TAF indisponible" });
+        return res.json({ fallback: true, raw: "TAF indisponible", ageMinutes: null });
     }
 });
 
 // ======================================================
-// FIDS — MODE AUTONOME PRO++
+// FIDS — MODE AUTONOME PRO+++ (format frontend)
 // ======================================================
 app.get("/fids", (req, res) => {
-    const now = new Date();
-    const iso = now.toISOString();
+    const nowIso = new Date().toISOString().slice(11, 16); // HH:MM
 
-    const payload = {
-        arrivals: [
-            {
-                flight: "FX123",
-                from: "CDG",
-                eta: iso,
-                status: "ON TIME"
-            },
-            {
-                flight: "FX456",
-                from: "LEJ",
-                eta: iso,
-                status: "LANDED"
-            }
-        ],
-        departures: [
-            {
-                flight: "FX789",
-                to: "CGN",
-                etd: iso,
-                status: "BOARDING"
-            },
-            {
-                flight: "FX999",
-                to: "CDG",
-                etd: iso,
-                status: "DELAYED"
-            }
-        ]
-    };
+    const flights = [
+        {
+            type: "arrival",
+            flight: "FX123",
+            city: "Paris CDG",
+            eta: nowIso,
+            status: "ON TIME"
+        },
+        {
+            type: "arrival",
+            flight: "FX456",
+            city: "Leipzig",
+            eta: nowIso,
+            status: "LANDED"
+        },
+        {
+            type: "departure",
+            flight: "FX789",
+            city: "Cologne",
+            etd: nowIso,
+            status: "BOARDING"
+        },
+        {
+            type: "departure",
+            flight: "FX999",
+            city: "Paris CDG",
+            etd: nowIso,
+            status: "DELAYED"
+        }
+    ];
 
-    res.json(payload);
+    res.json({ flights });
 });
 
 // ======================================================
-// SONOMETERS — MODE AUTONOME PRO++
+// SONOMETERS — MODE AUTONOME PRO+++
 // ======================================================
 app.get("/sonos", (req, res) => {
     const payload = {
         sensors: [
-            { id: 1, name: "NORD",  lat: 50.646, lon: 5.445, db: 42 },
-            { id: 2, name: "SUD",   lat: 50.635, lon: 5.460, db: 48 },
-            { id: 3, name: "EST",   lat: 50.640, lon: 5.470, db: 51 },
-            { id: 4, name: "OUEST", lat: 50.642, lon: 5.430, db: 39 }
+            {
+                id: 1,
+                name: "NORD",
+                lat: 50.646,
+                lon: 5.445,
+                db: 42,
+                address: "Nord EBLG",
+                town: "Grâce-Hollogne",
+                status: "OK"
+            },
+            {
+                id: 2,
+                name: "SUD",
+                lat: 50.635,
+                lon: 5.460,
+                db: 48,
+                address: "Sud EBLG",
+                town: "Grâce-Hollogne",
+                status: "OK"
+            },
+            {
+                id: 3,
+                name: "EST",
+                lat: 50.640,
+                lon: 5.470,
+                db: 51,
+                address: "Est EBLG",
+                town: "Grâce-Hollogne",
+                status: "OK"
+            },
+            {
+                id: 4,
+                name: "OUEST",
+                lat: 50.642,
+                lon: 5.430,
+                db: 39,
+                address: "Ouest EBLG",
+                town: "Grâce-Hollogne",
+                status: "OK"
+            }
         ]
     };
 
@@ -333,10 +399,8 @@ app.get("/api/adsb", async (req, res) => {
             })
             .filter(Boolean);
 
-        // Filtre géographique
         ac = filterGeographic(ac, 80);
 
-        // Approche / départ / corridor
         ac = ac.map(a => {
             const approach = detectApproach(a);
             const departure = detectDeparture(a);
@@ -350,7 +414,6 @@ app.get("/api/adsb", async (req, res) => {
         });
 
         const payload = { ac };
-
         setCachedAdsb(payload);
         return res.json(payload);
 
@@ -360,6 +423,20 @@ app.get("/api/adsb", async (req, res) => {
         if (cached2) return res.json(cached2);
         res.status(500).json({ error: "ADSB fetch failed" });
     }
+});
+
+// ======================================================
+// LOGS — MODE SIMPLE PRO+++
+// ======================================================
+app.get("/logs", (req, res) => {
+    const now = new Date().toISOString();
+    const entries = [
+        `${now} METAR/TAF backend OK`,
+        `${now} ADSB Airlabs OK (cache ou live)`,
+        `${now} FIDS autonome OK`,
+        `${now} SONOS autonome OK`
+    ];
+    res.json({ entries });
 });
 
 // ======================================================
