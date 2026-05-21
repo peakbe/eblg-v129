@@ -4,7 +4,7 @@
 // ======================================================
 
 import { ENDPOINTS } from "./config.js";
-import { fetchJSON, updateStatusPanel } from "./helpers.js";
+import { fetchJSON, updateStatusPanel, haversine } from "./helpers.js";
 import { map } from "./map.js";
 
 const IS_DEV = location.hostname.includes("localhost") || location.hostname.includes("127.0.0.1");
@@ -20,6 +20,7 @@ let sonoMarkersLayer = null;
 export async function loadSonometers() {
     try {
         const data = await fetchJSON(ENDPOINTS.sono);
+
         if (!data || !data.sensors) {
             logErr("Données sonomètres invalides", data);
             updateStatusPanel("SONO", { error: true });
@@ -27,11 +28,13 @@ export async function loadSonometers() {
         }
 
         sonoDataRaw = data.sensors.map(normalizeSensor);
+
         populateTownFilter(sonoDataRaw);
         renderSonometers();
 
         updateStatusPanel("SONO", { ok: true });
         log("Sonomètres chargés :", sonoDataRaw.length);
+
     } catch (err) {
         logErr("Erreur loadSonometers", err);
         updateStatusPanel("SONO", { error: true });
@@ -56,7 +59,7 @@ function normalizeSensor(s) {
 }
 
 // ------------------------------------------------------
-// Calcul distance piste → sonomètre (approx, en mètres)
+// Distance piste → sonomètre
 // ------------------------------------------------------
 function computeDistanceToRunway(lat, lon) {
     if (!window.activeRunway || !window.runwayThresholds) return null;
@@ -64,10 +67,7 @@ function computeDistanceToRunway(lat, lon) {
     const thr = window.runwayThresholds[window.activeRunway];
     if (!thr) return null;
 
-    const dx = (lat - thr.lat);
-    const dy = (lon - thr.lon);
-
-    return Math.sqrt(dx * dx + dy * dy) * 111000;
+    return haversine(lat, lon, thr.lat, thr.lon);
 }
 
 // ------------------------------------------------------
@@ -118,18 +118,15 @@ function getATCColor(db) {
 function renderSonometers() {
     if (!sonoDataRaw.length) return;
 
-    // distance
     const enriched = sonoDataRaw.map(s => ({
         ...s,
         distance: computeDistanceToRunway(s.lat, s.lon)
     }));
 
-    // filtre
     const townSel = document.getElementById("sono-filter-town");
     const town = townSel ? townSel.value : "all";
     let list = filterSonometers(enriched, town);
 
-    // tri
     const sortSel = document.getElementById("sono-sort");
     const mode = sortSel ? sortSel.value : "distance";
     list = sortSonometers(list, mode);
@@ -179,14 +176,14 @@ function renderSonoList(list) {
 // Rendu markers sur la carte
 // ------------------------------------------------------
 function renderSonoMarkers(list) {
-    if (!import { map } from "./map.js";) {
-        logErr("import { map } from "./map.js"; non défini, impossible de rendre les markers");
+    if (!map) {
+        logErr("map non défini, impossible de rendre les markers");
         return;
     }
 
     if (sonoMarkersLayer) {
         sonoMarkersLayer.clearLayers();
-        import { map } from "./map.js";.removeLayer(sonoMarkersLayer);
+        map.removeLayer(sonoMarkersLayer);
     }
 
     sonoMarkersLayer = L.layerGroup();
@@ -208,9 +205,7 @@ function renderSonoMarkers(list) {
         sonoMarkersLayer.addLayer(m);
     });
 
-    if (!map) return;
-sonoMarkersLayer.addTo(map);
-
+    sonoMarkersLayer.addTo(map);
 }
 
 // ------------------------------------------------------
@@ -219,18 +214,14 @@ sonoMarkersLayer.addTo(map);
 function highlightMarker(id) {
     if (!sonoMarkersLayer) return;
     sonoMarkersLayer.eachLayer(m => {
-        if (m._sonoId === id) {
-            m._icon && m._icon.classList.add("active");
-        }
+        if (m._sonoId === id && m._icon) m._icon.classList.add("active");
     });
 }
 
 function unhighlightMarker(id) {
     if (!sonoMarkersLayer) return;
     sonoMarkersLayer.eachLayer(m => {
-        if (m._sonoId === id) {
-            m._icon && m._icon.classList.remove("active");
-        }
+        if (m._sonoId === id && m._icon) m._icon.classList.remove("active");
     });
 }
 
@@ -245,8 +236,8 @@ function unhighlightListItem(id) {
 }
 
 function focusOnSensor(s) {
-    if (!import { map } from "./map.js";) return;
-    import { map } from "./map.js";.setView([s.lat, s.lon], 15);
+    if (!map) return;
+    map.setView([s.lat, s.lon], 15);
 }
 
 // ------------------------------------------------------
