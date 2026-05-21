@@ -32,6 +32,9 @@ app.use(express.static(publicDir));
 // METAR — EBLG
 // ======================================================
 app.get("/metar", async (req, res) => {
+    const cached = getCachedMetar();
+    if (cached) return res.json(cached);
+
     try {
         const url = "https://api.checkwx.com/metar/EBLG/decoded";
         const r = await fetch(url, {
@@ -40,14 +43,18 @@ app.get("/metar", async (req, res) => {
 
         if (!r.ok) {
             console.error("[METAR] HTTP", r.status);
+            if (cached) return res.json(cached);
             return res.json({ fallback: true, raw: "METAR indisponible" });
         }
 
         const json = await r.json();
+        setCachedMetar(json);
         return res.json(json);
 
     } catch (err) {
         console.error("[METAR] Erreur", err);
+        const cached = getCachedMetar();
+        if (cached) return res.json(cached);
         return res.json({ fallback: true, raw: "METAR indisponible" });
     }
 });
@@ -56,6 +63,9 @@ app.get("/metar", async (req, res) => {
 // TAF — EBLG
 // ======================================================
 app.get("/taf", async (req, res) => {
+    const cached = getCachedTaf();
+    if (cached) return res.json(cached);
+
     try {
         const url = "https://api.checkwx.com/taf/EBLG/decoded";
         const r = await fetch(url, {
@@ -64,14 +74,18 @@ app.get("/taf", async (req, res) => {
 
         if (!r.ok) {
             console.error("[TAF] HTTP", r.status);
+            if (cached) return res.json(cached);
             return res.json({ fallback: true, raw: "TAF indisponible" });
         }
 
         const json = await r.json();
+        setCachedTaf(json);
         return res.json(json);
 
     } catch (err) {
         console.error("[TAF] Erreur", err);
+        const cached = getCachedTaf();
+        if (cached) return res.json(cached);
         return res.json({ fallback: true, raw: "TAF indisponible" });
     }
 });
