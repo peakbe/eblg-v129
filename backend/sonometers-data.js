@@ -22,7 +22,7 @@ lon: 5.608833,
 db: 42,
 address: "Rue Franquet",
 town: "Houtain",
-status: "OK"}
+status: "OK"},
 
     {
 id: F014,
@@ -32,7 +32,7 @@ lon: 5.573164,
 db: 42,
 address: "Rue Léon Labaye",
 town: "Juprelle",
-status: "OK"}
+status: "OK"},
 
     {
 id: F015,
@@ -127,7 +127,7 @@ status: "OK"},
         db: 46,
         address: "Rue Haute Voie",
         town: "Verlaine",
-        status: "OK"}
+        status: "OK"},
 
     { id: "F013",
         name: "F013",
@@ -136,7 +136,7 @@ status: "OK"},
         db: 46,
         address: "Rue Bois Léon", 
         town: "Verlaine",
-        status: "OK"}
+        status: "OK"},
 
 
     { id: "F016",
@@ -146,7 +146,7 @@ status: "OK"},
         db: 46,
         address: "Rue de Chapon-Seraing", 
         town: "Verlaine",
-        status: "OK"}
+        status: "OK"},
 
 
     { id: "F006",
@@ -156,7 +156,7 @@ status: "OK"},
          db: 46,
         address: "Rue Bolly"
         town: "Chapon-Seraing",
-        status: "OK"}
+        status: "OK"},
 
 
     { id: "F012",
@@ -165,6 +165,7 @@ status: "OK"},
         lon: 5.254747,
         db: 48,
         address: "Rue Barbe d'Or", 
-        town: "Aineffe",  }
+        town: "Aineffe",
+        status: "OK"}},
 ];
     export default SONOMETERS;
