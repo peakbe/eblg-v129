@@ -7,16 +7,127 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import {
     getCachedMetar,
     setCachedMetar,
     getCachedTaf,
     setCachedTaf
 } from "./metarCache.mjs";
+
 import {
     getCachedAdsb,
     setCachedAdsb
 } from "./adsbCache.mjs";
+
+// ======================================================
+// ADS-B — CONSTANTES EBLG
+// ======================================================
+const EBLG = { lat: 50.637, lon: 5.443 };
+
+const RWY = {
+    "04": { lat: 50.64594, lon: 5.44321, heading: 40 },
+    "22": { lat: 50.63302, lon: 5.46163, heading: 220 }
+};
+
+// ======================================================
+// ADS-B — OUTILS GÉOMÉTRIQUES PRO+++
+// ======================================================
+function distKm(lat1, lon1, lat2, lon2) { ... }
+
+function bearingTo(lat1, lon1, lat2, lon2) { ... }
+
+function angleDiff(a, b) { ... }
+
+// ======================================================
+// ADS-B — FILTRE GÉOGRAPHIQUE PRO+++
+// ======================================================
+function filterGeographic(acList, radiusKm = 80) { ... }
+
+// ======================================================
+// ADS-B — DÉTECTION APPROCHE RWY 04/22 PRO+++
+// ======================================================
+function detectApproach(ac) { ... }
+
+// 1) Coordonnées EBLG
+const EBLG = { lat: 50.637, lon: 5.443 };
+
+// 2) Fonction distance Haversine
+function distKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) ** 2;
+
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// 3) Filtre géographique PRO+++
+function filterGeographic(acList, radiusKm = 80) {
+    return acList.filter(ac => {
+        const d = distKm(EBLG.lat, EBLG.lon, ac.lat, ac.lon);
+        return d <= radiusKm;
+    });
+}
+
+
+// 4) Endpoint ADS-B PRO+++
+app.get("/api/adsb", async (req, res) => {
+    const cached = getCachedAdsb();
+    if (cached) return res.json(cached);
+
+    try {
+        const url = `https://airlabs.co/api/v9/flights?api_key=${process.env.AIRLABS_KEY}`;
+        const r = await fetch(url);
+
+        if (!r.ok) {
+            console.error("[ADSB] AirLabs HTTP", r.status);
+            if (cached) return res.json(cached);
+            return res.status(502).json({ error: "Airlabs upstream error" });
+        }
+
+        const json = await r.json();
+        const flights = json.response || [];
+
+        let ac = flights
+            .map(f => {
+                if (!f.lat || !f.lng) return null;
+
+                return {
+                    icao: f.hex || null,
+                    hex: f.hex || null,
+                    call: f.flight_icao || f.flight_iata || "",
+                    lat: f.lat,
+                    lon: f.lng,
+                    alt_baro: f.alt || null,
+                    gs: f.speed || null,
+                    track: f.dir || null,
+                    type: f.aircraft_icao || null
+                };
+            })
+            .filter(Boolean);
+
+        // 🔥 FILTRE GÉOGRAPHIQUE PRO+++
+        ac = filterGeographic(ac, 80);
+
+        const payload = { ac };
+
+        setCachedAdsb(payload);
+        return res.json(payload);
+
+    } catch (e) {
+        console.error("[ADSB] AirLabs fetch failed", e);
+        const cached = getCachedAdsb();
+        if (cached) return res.json(cached);
+        res.status(500).json({ error: "ADSB fetch failed" });
+    }
+});
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -192,6 +303,24 @@ app.get("/api/adsb", async (req, res) => {
                 };
             })
             .filter(Boolean);
+return {
+    icao: f.hex || null,
+    hex: f.hex || null,
+    call: f.flight_icao || f.flight_iata || "",
+    lat: f.lat,
+    lon: f.lng,
+    alt_baro: f.alt || null,
+    gs: f.speed || null,
+    track: f.dir || null,
+    type: f.aircraft_icao || null,
+    approach: detectApproach({
+        lat: f.lat,
+        lon: f.lng,
+        alt: f.alt,
+        gs: f.speed,
+        track: f.dir
+    })
+};
 
         const payload = { ac };
 
